@@ -95,7 +95,10 @@ public class FileUtils extends CordovaPlugin {
 
     private String [] permissions = {
             Manifest.permission.READ_EXTERNAL_STORAGE,
-            Manifest.permission.WRITE_EXTERNAL_STORAGE };
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+            Manifest.permission.READ_MEDIA_IMAGES,
+            Manifest.permission.READ_MEDIA_VIDEO,
+            Manifest.permission.READ_MEDIA_AUDIO};
 
     // This field exists only to support getEntry, below, which has been deprecated
     private static FileUtils filePlugin;
@@ -551,20 +554,36 @@ public class FileUtils extends CordovaPlugin {
 
     private void getReadPermission(String rawArgs, int action, CallbackContext callbackContext) {
         int requestCode = pendingRequests.createRequest(rawArgs, action, callbackContext);
-        PermissionHelper.requestPermission(this, requestCode, Manifest.permission.READ_EXTERNAL_STORAGE);
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PermissionHelper.requestPermissions(this, requestCode,
+                    new String[]{Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO, Manifest.permission.READ_MEDIA_AUDIO});
+        } else {
+            PermissionHelper.requestPermission(this, requestCode, Manifest.permission.READ_EXTERNAL_STORAGE);
+        }
     }
 
     private void getWritePermission(String rawArgs, int action, CallbackContext callbackContext) {
-        int requestCode = pendingRequests.createRequest(rawArgs, action, callbackContext);
-        PermissionHelper.requestPermission(this, requestCode, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            int requestCode = pendingRequests.createRequest(rawArgs, action, callbackContext);
+            PermissionHelper.requestPermission(this, requestCode, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
     }
 
     private boolean hasReadPermission() {
-        return PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE);
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_IMAGES)
+                    && PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_VIDEO)
+                    && PermissionHelper.hasPermission(this, Manifest.permission.READ_MEDIA_AUDIO);
+        } else {
+            return PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE);
+        }
     }
 
     private boolean hasWritePermission() {
-        return PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        // Starting with API 33, requesting WRITE_EXTERNAL_STORAGE is an auto permission rejection
+        return android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                ? true
+                : PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
     }
 
     private boolean needPermission(String nativeURL, int permissionType) throws JSONException {
